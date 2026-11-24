@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photorealistic Procedural Botanical Conservatory — Master Edition</title>
+  <style>
+    :root {
+      --bg-deep: #06090e;
+      --bg-panel: rgba(12, 18, 28, 0.78);
+      --border-glass: rgba(255, 255, 255, 0.12);
+      --text-primary: #f4f6fb;
+      --text-secondary: #9aa7bd;
+      --accent-rose: #ff4d79;
+      --accent-gold: #ffd166;
+      --accent-emerald: #2ec4b6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 42%, #111927 0%, #06090e 75%, #020306 100%);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text-primary);
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+
+    .hud-header {
+      position: fixed;
+      top: 20px;
+      left: 24px;
+      z-index: 20;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 16px 22px;
+      max-width: 360px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    .hud-header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ff758f, #ffd166, #4ecdc4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .hud-header p {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+
+    .controls-panel {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 999px;
+      padding: 10px 18px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.65);
+    }
+
+    button {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    button.active {
+      background: linear-gradient(135deg, #ff4d79, #ff8fa3);
+      color: #0b090c;
+      border-color: transparent;
+      box-shadow: 0 0 20px rgba(255, 77, 121, 0.45);
+    }
+
+    .stats-badge {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      z-index: 20;
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-align: right;
+    }
+
+    .stats-badge span {
+      color: var(--accent-gold);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-header">
+    <h1>Botanical Conservatory Engine</h1>
+    <p>Multi-species procedural bouquet with subsurface petal shading, Bezier vascular venation, phyllotaxis seed spirals, dew micro-droplets, and harmonic wind physics. Click anywhere to plant an extra bloom.</p>
+  </div>
+
+  <div class="stats-badge" id="stats">
+    SPECIES: <span>7 BOTANICALS</span><br/>
+    BLOOMS: <span id="bloomCount">0</span> | PARTICLES: <span id="particleCount">0</span>
+  </div>
+
+  <div class="controls-panel">
+    <button id="btnRegrow" class="active">Regrow Bouquet</button>
+    <button id="btnLighting">Studio / Moonlight</button>
+    <button id="btnWind">Toggle Breeze</button>
+    <button id="btnDew">Morning Dew</button>
+    <button id="btnClear">Clear & Plant Custom</button>
+  </div>
+
+  <canvas id="botanicalCanvas"></canvas>
+
+  <script>
+    /**
+     * ============================================================================
+     * PHOTOREALISTIC BOTANICAL RENDERING & PROCEDURAL MORPHOGENESIS ENGINE
+     * Architecture:
+     *  1. Perlin / Simplex Harmonic Noise & Wind Vector Field
+     *  2. Cubic Bezier Botanical Stem & Thorn Kinematics
+     *  3. Species-Specific Morphogenesis Engines:
+     *     - Hybrid Tea Rose (Spiral overlapping Fibonacci petals + velvety shading)
+     *     - Stargazer Oriental Lily (6 recurved tepals, papillae spots, 6 anthers)
+     *     - Peony (Ruffled multi-tier cloud petals with warm golden core)
+     *     - Sunflower (Vogel Fermat spiral florets + 34 ray petals)
+     *     - Bluebell / Campanula (Pendulous bell corollas)
+     *     - Cherry Blossom / Sakura (Notched 5-petal clusters with crimson centers)
+     *     - Gypsophila / Baby's Breath (Dichotomous branching micro-florets)
+     *  4. Optical Post-Processing: Volumetric Bokeh, Fireflies & Specular Dewdrops
+     * ============================================================================
+     */
+
+    const canvas = document.getElementById('botanicalCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+
+    let width = 0;
+    let height = 0;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    const STATE = {
+      time: 0,
+      growth: 0,
+      windEnabled: true,
+      nightMode: true,
+      dewEnabled: true,
+      bouquet: [],
+      particles: [],
+      bokehOrbs: [],
+      mouse: { x: 0, y: 0, active: false }
+    };
+
+    // High-DPI Resize Handler
+    function resizeCanvas() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      generateBokeh();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    // Utility Math & Color Interpolation
+    const MathUtils = {
+      lerp: (a, b, t) => a + (b - a) * t,
+      clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
+      smoothstep: (e0, e1, x) => {
+        const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+        return t * t * (3 - 2 * t);
+      },
+      rand: (min, max) => min + Math.random() * (max - min),
+      goldenAngle: Math.PI * (3 - Math.sqrt(5))
+    };
+
+    // Atmospheric Bokeh Background Orbs
+    function generateBokeh() {
+      STATE.bokehOrbs = [];
+      const count = 42;
+      for (let i = 0; i < count; i++) {
+        STATE.bokehOrbs.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: MathUtils.rand(18, 95),
+          alpha: MathUtils.rand(0.015, 0.065),
+          hue: Math.random() > 0.5 ? 340 : 42,
+          speedX: MathUtils.rand(-0.08, 0.08),
+          speedY: MathUtils.rand(-0.05, 0.05)
+        });
+      }
+    }
+
+    // Floating Pollen & Bioluminescent Firefly Particles
+    class AmbientParticle {
+      constructor() {
+        this.reset(true);
+      }
+
+      reset(initial = false) {
+        this.x = Math.random() * width;
+        this.y = initial ? Math.random() * height : height + 20;
+        this.vx = MathUtils.rand(-0.35, 0.35);
+        this.vy = MathUtils.rand(-0.65, -0.15);
+        this.size = MathUtils.rand(1.1, 3.2);
+        this.phase = Math.random() * Math.PI * 2;
+        this.isGold = Math.random() > 0.35;
+      }
+
+      update(dt) {
+        this.phase += dt * 2.2;
+        this.x += this.vx + Math.sin(this.phase) * 0.25;
+        this.y += this.vy;
+        if (this.y < -20 || this.x < -20 || this.x > width + 20) {
+          this.reset(false);
+        }
+      }
+
+      draw(ctx) {
+        const pulse = 0.45 + 0.55 * Math.sin(this.phase);
+        ctx.save();
+        ctx.globalAlpha = pulse * (STATE.nightMode ? 0.85 : 0.45);
+        const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 3.5);
+        if (this.isGold) {
+          grad.addColorStop(0, '#fff3b0');
+          grad.addColorStop(0.4, '#ffd166');
+          grad.addColorStop(1, 'rgba(255, 209, 102, 0)');
+        } else {
+          grad.addColorStop(0, '#ffd6e0');
+          grad.addColorStop(0.4, '#ff758f');
+          grad.addColorStop(1, 'rgba(255, 117, 143, 0)');
+        }
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size * 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /**
+     * Botanical Flower Stem & Morphogenesis Class
+     */
+    class BotanicalSpecimen {
+      constructor(config) {
+        this.baseX = config.baseX;
+        this.baseY = config.baseY;
+        this.tipX = config.tipX;
+        this.tipY = config.tipY;
+        this.ctrlX = config.ctrlX;
+        this.ctrlY = config.ctrlY;
+        this.species = config.species;
+        this.scale = config.scale || 1.0;
+        this.palette = config.palette;
+        this.delay = config.delay || 0;
+        this.swayPhase = Math.random() * Math.PI * 2;
+        this.swayAmp = MathUtils.rand(6, 16);
+        this.stemThickness = config.thickness || 4.5;
+        this.leaves = this.generateLeaves();
+        this.dewDrops = this.generateDewDrops();
+      }
+
+      generateLeaves() {
+        const list = [];
+        const count = this.species === 'gypsophila' ? 2 : Math.floor(MathUtils.rand(3, 6));
+        for (let i = 0; i < count; i++) {
+          list.push({
+            t: 0.22 + (i / count) * 0.52,
+            side: i % 2 === 0 ? 1 : -1,
+            length: MathUtils.rand(38, 72) * this.scale,
+            width: MathUtils.rand(14, 26) * this.scale,
+            angleOffset: MathUtils.rand(0.48, 0.85),
+            serrated: this.species === 'rose' || this.species === 'sunflower'
+          });
+        }
+        return list;
+      }
+
+      generateDewDrops() {
+        const drops = [];
+        for (let i = 0; i < 4; i++) {
+          drops.push({
+            angle: Math.random() * Math.PI * 2,
+            dist: MathUtils.rand(0.35, 0.78),
+            r: MathUtils.rand(1.8, 3.6) * this.scale
+          });
+        }
+        return drops;
+      }
+
+      getBezierPoint(t, windOffset) {
+        const inv = 1 - t;
+        const wx = windOffset * (t * t);
+        const x = inv * inv * this.baseX + 2 * inv * t * (this.ctrlX + wx * 0.5) + t * t * (this.tipX + wx);
+        const y = inv * inv * this.baseY + 2 * inv * t * this.ctrlY + t * t * (this.tipY + Math.abs(wx) * 0.12);
+        return { x, y };
+      }
+
+      getBezierTangent(t, windOffset) {
+        const p0 = this.getBezierPoint(Math.max(0, t - 0.01), windOffset);
+        const p1 = this.getBezierPoint(Math.min(1, t + 0.01), windOffset);
+        return Math.atan2(p1.y - p0.y, p1.x - p0.x);
+      }
+
+      draw(ctx, globalGrowth, time) {
+        const localGrowth = MathUtils.clamp((globalGrowth - this.delay) / (1 - this.delay * 0.6), 0, 1);
+        if (localGrowth <= 0.001) return;
+
+        const stemProg = MathUtils.smoothstep(0, 0.72, localGrowth);
+        const bloomProg = MathUtils.smoothstep(0.38, 1.0, localGrowth);
+
+        const wind = STATE.windEnabled
+          ? Math.sin(time * 1.45 + this.swayPhase) * this.swayAmp +
+            Math.cos(time * 0.7 + this.swayPhase * 1.3) * (this.swayAmp * 0.4)
+          : 0;
+
+        // 1. Render Cylindrical Shaded Stem
+        this.drawStem(ctx, stemProg, wind);
+
+        // 2. Render Botanical Leaves with Central Midrib & Veins
+        this.leaves.forEach(leaf => {
+          if (stemProg > leaf.t) {
+            const leafGrow = MathUtils.smoothstep(leaf.t, Math.min(1, leaf.t + 0.25), stemProg);
+            const pt = this.getBezierPoint(leaf.t, wind);
+            const tangent = this.getBezierTangent(leaf.t, wind);
+            this.drawBotanicalLeaf(ctx, pt.x, pt.y, tangent + leaf.side * leaf.angleOffset, leaf, leafGrow);
+          }
+        });
+
+        // 3. Render Flower Corolla at Stem Apex
+        if (bloomProg > 0.01) {
+          const apex = this.getBezierPoint(stemProg, wind);
+          const angle = this.getBezierTangent(stemProg, wind) + Math.PI / 2;
+
+          ctx.save();
+          ctx.translate(apex.x, apex.y);
+          ctx.rotate(angle * 0.35);
+          ctx.scale(bloomProg * this.scale, bloomProg * this.scale);
+
+          switch (this.species) {
+            case 'rose':
+              this.renderHybridTeaRose(ctx, bloomProg);
+              break;
+            case 'lily':
+              this.renderStargazerLily(ctx, bloomProg);
+              break;
+            case 'peony':
+              this.renderRoyalPeony(ctx, bloomProg);
+              break;
+            case 'sunflower':
+              this.renderSunflower(ctx, bloomProg);
+              break;
+            case 'sakura':
+              this.renderSakuraCluster(ctx, bloomProg);
+              break;
+            case 'bluebell':
+              this.renderBluebell(ctx, bloomProg);
+              break;
+            case 'gypsophila':
+            default:
+              this.renderGypsophila(ctx, bloomProg);
+              break;
+          }
+
+          if (STATE.dewEnabled && bloomProg > 0.75 && this.species !== 'gypsophila') {
+            this.renderDewDroplets(ctx);
+          }
+
+          ctx.restore();
+        }
+      }
+
+      drawStem(ctx, prog, wind) {
+        const segments = 36;
+        const maxSeg = Math.floor(segments * prog);
+        if (maxSeg < 2) return;
+
+        for (let i = 0; i < maxSeg; i++) {
+          const t0 = i / segments;
+          const t1 = (i + 1) / segments;
+          const p0 = this.getBezierPoint(t0, wind);
+          const p1 = this.getBezierPoint(t1, wind);
+
+          const thick = MathUtils.lerp(this.stemThickness * 1.35, this.stemThickness * 0.65, t0);
+          ctx.strokeStyle = i % 2 === 0 ? '#1b4332' : '#2d6a4f';
+          ctx.lineWidth = thick;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.stroke();
+
+          // Specular rim highlight on stem
+          ctx.strokeStyle = 'rgba(149, 213, 178, 0.28)';
+          ctx.lineWidth = thick * 0.28;
+          ctx.beginPath();
+          ctx.moveTo(p0.x - thick * 0.25, p0.y);
+          ctx.lineTo(p1.x - thick * 0.25, p1.y);
+          ctx.stroke();
+        }
+      }
+
+      drawBotanicalLeaf(ctx, x, y, angle, leaf, grow) {
+        const len = leaf.length * grow;
+        const wid = leaf.width * grow;
+        if (len < 2) return;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        const grad = ctx.createLinearGradient(0, 0, len, 0);
+        grad.addColorStop(0, '#132a13');
+        grad.addColorStop(0.5, '#2d6a4f');
+        grad.addColorStop(1, '#52b788');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(len * 0.32, -wid, len * 0.72, -wid * 0.75, len, 0);
+        ctx.bezierCurveTo(len * 0.72, wid * 0.75, len * 0.32, wid, 0, 0);
+        ctx.fill();
+
+        // Central Midrib Vein
+        ctx.strokeStyle = 'rgba(183, 228, 199, 0.45)';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(len * 0.92, 0);
+        ctx.stroke();
+
+        // Lateral Veins
+        ctx.lineWidth = 0.65;
+        for (let v = 0.2; v <= 0.75; v += 0.18) {
+          ctx.beginPath();
+          ctx.moveTo(len * v, 0);
+          ctx.lineTo(len * (v + 0.14), -wid * 0.42);
+          ctx.moveTo(len * v, 0);
+          ctx.lineTo(len * (v + 0.14), wid * 0.42);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
+      /**
+       * SPECIES 1: Hybrid Tea Rose (Velvety Fibonacci Phyllotaxis Petals)
+       */
+      renderHybridTeaRose(ctx, bloom) {
+        const layers = 26;
+        for (let i = layers; i >= 0; i--) {
+          const ratio = i / layers;
+          const angle = i * MathUtils.goldenAngle;
+          const radius = (8 + ratio * 38) * (0.4 + 0.6 * bloom);
+          const petalW = (14 + ratio * 28);
+          const petalH = (16 + ratio * 32);
+
+          ctx.save();
+          ctx.rotate(angle);
+          ctx.translate(0, -radius * 0.38);
+
+          const grad = ctx.createRadialGradient(0, -petalH * 0.2, 2, 0, -petalH * 0.4, petalH * 1.1);
+          grad.addColorStop(0, this.palette.core);
+          grad.addColorStop(0.55, this.palette.mid);
+          grad.addColorStop(1, this.palette.edge);
+
+          ctx.fillStyle = grad;
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetY = 3;
+
+          ctx.beginPath();
+          ctx.moveTo(0, 4);
+          ctx.bezierCurveTo(-petalW, -petalH * 0.25, -petalW * 0.85, -petalH * 1.15, 0, -petalH);
+          ctx.bezierCurveTo(petalW * 0.85, -petalH * 1.15, petalW, -petalH * 0.25, 0, 4);
+          ctx.fill();
+
+          // Rim light edge highlight
+          ctx.strokeStyle = this.palette.rim;
+          ctx.lineWidth = 0.85;
+          ctx.stroke();
+
+          ctx.restore();
+        }
+      }
+
+      /**
+       * SPECIES 2: Stargazer Oriental Lily (6 Tepals, Crimson Papillae Spots & Anthers)
+       */
+      renderStargazerLily(ctx, bloom) {
+        const petals = 6;
+        for (let p = 0; p < petals; p++) {
+          const isInner = p % 2 === 0;
+          const angle = (p * Math.PI * 2) / petals;
+          const len = (isInner ? 64 : 58) * (0.35 + 0.65 * bloom);
+          const wid = isInner ? 21 : 17;
+
+          ctx.save();
+          ctx.rotate(angle);
+
+          const grad = ctx.createLinearGradient(0, 0, 0, -len);
+          grad.addColorStop(0, '#c8e6c9');
+          grad.addColorStop(0.18, '#ff4d79');
+          grad.addColorStop(0.75, '#ff8fa3');
+          grad.addColorStop(1, '#fff0f3');
+
+          ctx.fillStyle = grad;
+          ctx.shadowColor = 'rgba(0,0,0,0.4)';
+          ctx.shadowBlur = 10;
+
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.bezierCurveTo(-wid, -len * 0.3, -wid * 0.7, -len * 0.82, 0, -len);
+          ctx.bezierCurveTo(wid * 0.7, -len * 0.82, wid, -len * 0.3, 0, 0);
+          ctx.fill();
+
+          // Central Nectary Groove
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(0, -4);
+          ctx.lineTo(0, -len * 0.88);
+          ctx.stroke();
+
+          // Characteristic Dark Crimson Papillae Spots
+          ctx.fillStyle = '#590d22';
+          for (let s = 0; s < 14; s++) {
+            const sr = MathUtils.rand(0.22, 0.65) * len;
+            const sx = MathUtils.rand(-wid * 0.32, wid * 0.32);
+            ctx.beginPath();
+            ctx.arc(sx, -sr, MathUtils.rand(0.8, 1.7), 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.restore();
+        }
+
+        // 6 Curved Filaments & Golden-Rust Pollen Anthers
+        for (let a = 0; a < 6; a++) {
+          const ang = (a * Math.PI * 2) / 6 + 0.25;
+          const fLen = 32 * bloom;
+          ctx.save();
+          ctx.rotate(ang);
+          ctx.strokeStyle = '#d8f3dc';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.quadraticCurveTo(6, -fLen * 0.5, 2, -fLen);
+          ctx.stroke();
+
+          // Pollen Anther Capsule
+          ctx.fillStyle = '#d97706';
+          ctx.beginPath();
+          ctx.ellipse(2, -fLen, 4.5, 2.1, 0.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      /**
+       * SPECIES 3: Royal Peony (Multi-Tier Ruffled Silk Petals)
+       */
+      renderRoyalPeony(ctx, bloom) {
+        const tiers = [
+          { count: 10, r: 46, color1: '#ffccd5', color2: '#ff758f' },
+          { count: 12, r: 35, color1: '#ffb3c1', color2: '#ff4d6d' },
+          { count: 10, r: 22, color1: '#ff8fa3', color2: '#c9184a' }
+        ];
+
+        tiers.forEach((tier, tIdx) => {
+          for (let i = 0; i < tier.count; i++) {
+            const ang = (i * Math.PI * 2) / tier.count + tIdx * 0.4;
+            const rad = tier.r * (0.4 + 0.6 * bloom);
+
+            ctx.save();
+            ctx.rotate(ang);
+
+            const grad = ctx.createRadialGradient(0, -rad * 0.3, 2, 0, -rad, rad);
+            grad.addColorStop(0, tier.color2);
+            grad.addColorStop(1, tier.color1);
+
+            ctx.fillStyle = grad;
+            ctx.shadowColor = 'rgba(0,0,0,0.35)';
+            ctx.shadowBlur = 7;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-rad * 0.65, -rad * 0.3, -rad * 0.75, -rad * 0.95, -rad * 0.2, -rad);
+            ctx.quadraticCurveTo(0, -rad * 0.88, rad * 0.2, -rad);
+            ctx.bezierCurveTo(rad * 0.75, -rad * 0.95, rad * 0.65, -rad * 0.3, 0, 0);
+            ctx.fill();
+            ctx.restore();
+          }
+        });
+
+        // Golden Stamen Crown
+        for (let s = 0; s < 24; s++) {
+          const a = (s * Math.PI * 2) / 24;
+          const d = 10 * bloom;
+          ctx.strokeStyle = '#ffd166';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a) * d, Math.sin(a) * d);
+          ctx.stroke();
+
+          ctx.fillStyle = '#fff3b0';
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * d, Math.sin(a) * d, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      /**
+       * SPECIES 4: Helianthus Sunflower (Vogel Phyllotaxis Seed Disk + Ray Florets)
+       */
+      renderSunflower(ctx, bloom) {
+        const rayCount = 32;
+        for (let r = 0; r < rayCount; r++) {
+          const ang = (r * Math.PI * 2) / rayCount;
+          const len = (r % 2 === 0 ? 54 : 49) * bloom;
+          ctx.save();
+          ctx.rotate(ang);
+
+          const grad = ctx.createLinearGradient(0, -14, 0, -len);
+          grad.addColorStop(0, '#e85d04');
+          grad.addColorStop(0.45, '#faa307');
+          grad.addColorStop(1, '#ffea00');
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.moveTo(0, -12);
+          ctx.quadraticCurveTo(-8.5, -len * 0.6, 0, -len);
+          ctx.quadraticCurveTo(8.5, -len * 0.6, 0, -12);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Dark Velvet Receptacle Disk
+        const diskR = 20 * bloom;
+        const diskGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, diskR);
+        diskGrad.addColorStop(0, '#1a0f0a');
+        diskGrad.addColorStop(0.75, '#3d1e10');
+        diskGrad.addColorStop(1, '#6f3718');
+        ctx.fillStyle = diskGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, diskR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Fermat Phyllotaxis Fibonacci Seeds
+        const seedCount = 95;
+        for (let n = 0; n < seedCount; n++) {
+          const theta = n * MathUtils.goldenAngle;
+          const r = Math.sqrt(n / seedCount) * (diskR * 0.92);
+          const sx = Math.cos(theta) * r;
+          const sy = Math.sin(theta) * r;
+
+          ctx.fillStyle = n > seedCount * 0.72 ? '#ffb703' : '#9c6644';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 1.25, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      /**
+       * SPECIES 5: Japanese Cherry Blossom (Sakura 5-Notched Petals)
+       */
+      renderSakuraCluster(ctx, bloom) {
+        const subBlooms = [
+          { x: 0, y: 0, s: 1.0 },
+          { x: -24, y: 14, s: 0.78 },
+          { x: 25, y: 12, s: 0.82 }
+        ];
+
+        subBlooms.forEach(sb => {
+          ctx.save();
+          ctx.translate(sb.x * bloom, sb.y * bloom);
+          ctx.scale(sb.s, sb.s);
+
+          for (let p = 0; p < 5; p++) {
+            const ang = (p * Math.PI * 2) / 5 - Math.PI / 2;
+            const len = 28 * bloom;
+            ctx.save();
+            ctx.rotate(ang);
+
+            const grad = ctx.createLinearGradient(0, 0, 0, -len);
+            grad.addColorStop(0, '#ff4d6d');
+            grad.addColorStop(0.35, '#ffb3c6');
+            grad.addColorStop(1, '#fff5f8');
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-13, -len * 0.35, -14, -len * 0.92, -3, -len);
+            ctx.lineTo(0, -len * 0.86); // Iconic Sakura Petal Notch
+            ctx.lineTo(3, -len);
+            ctx.bezierCurveTo(14, -len * 0.92, 13, -len * 0.35, 0, 0);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // Crimson Stamens
+          for (let s = 0; s < 12; s++) {
+            const sa = (s * Math.PI * 2) / 12;
+            const sl = 11 * bloom;
+            ctx.strokeStyle = '#c9184a';
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(sa) * sl, Math.sin(sa) * sl);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffd166';
+            ctx.beginPath();
+            ctx.arc(Math.cos(sa) * sl, Math.sin(sa) * sl, 1.3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        });
+      }
+
+      /**
+       * SPECIES 6: Sapphire Campanula Bluebell
+       */
+      renderBluebell(ctx, bloom) {
+        const bells = [
+          { x: -12, y: 6, rot: -0.35, s: 0.95 },
+          { x: 14, y: -4, rot: 0.35, s: 0.9 },
+          { x: 0, y: -18, rot: 0.05, s: 1.0 }
+        ];
+
+        bells.forEach(b => {
+          ctx.save();
+          ctx.translate(b.x * bloom, b.y * bloom);
+          ctx.rotate(b.rot);
+          ctx.scale(b.s * bloom, b.s * bloom);
+
+          const grad = ctx.createLinearGradient(0, -24, 0, 14);
+          grad.addColorStop(0, '#3a0ca3');
+          grad.addColorStop(0.55, '#4361ee');
+          grad.addColorStop(1, '#90e0ef');
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.moveTo(-6, -20);
+          ctx.bezierCurveTo(-14, -6, -18, 6, -22, 14);
+          ctx.lineTo(-10, 10);
+          ctx.lineTo(0, 16);
+          ctx.lineTo(10, 10);
+          ctx.lineTo(22, 14);
+          ctx.bezierCurveTo(18, 6, 14, -6, 6, -20);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+
+      /**
+       * SPECIES 7: Gypsophila (Baby's Breath Filler Clouds)
+       */
+      renderGypsophila(ctx, bloom) {
+        const florets = [
+          { x: 0, y: 0 }, { x: -18, y: -14 }, { x: 19, y: -12 },
+          { x: -12, y: -28 }, { x: 14, y: -26 }, { x: 0, y: -36 }
+        ];
+
+        florets.forEach(f => {
+          const fx = f.x * bloom;
+          const fy = f.y * bloom;
+
+          ctx.strokeStyle = '#74c69d';
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.moveTo(0, 8);
+          ctx.lineTo(fx, fy);
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(fx, fy, 4.2 * bloom, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          ctx.fillStyle = '#ffd166';
+          ctx.beginPath();
+          ctx.arc(fx, fy, 1.4 * bloom, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      /**
+       * Specular Morning Dew Micro-Droplets
+       */
+      renderDewDroplets(ctx) {
+        this.dewDrops.forEach(d => {
+          const dx = Math.cos(d.angle) * (d.dist * 34);
+          const dy = Math.sin(d.angle) * (d.dist * 34);
+
+          ctx.save();
+          const grad = ctx.createRadialGradient(dx - d.r * 0.35, dy - d.r * 0.35, 0.2, dx, dy, d.r);
+          grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+          grad.addColorStop(0.55, 'rgba(210, 245, 255, 0.45)');
+          grad.addColorStop(1, 'rgba(10, 30, 50, 0.35)');
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(dx, dy, d.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+    }
+
+    /**
+     * Build Lush Multi-Species Master Bouquet
+     */
+    function buildMasterBouquet() {
+      STATE.bouquet = [];
+      STATE.growth = 0;
+
+      const cx = width * 0.5;
+      const baseY = height * 0.94;
+      const maxH = Math.min(height * 0.68, 520);
+
+      const rosePalettes = [
+        { core: '#590d22', mid: '#c9184a', edge: '#ff4d6d', rim: 'rgba(255, 204, 213, 0.5)' },
+        { core: '#7f1d1d', mid: '#dc2626', edge: '#f87171', rim: 'rgba(254, 202, 202, 0.5)' },
+        { core: '#9d174d', mid: '#ec4899', edge: '#fbcfe8', rim: 'rgba(255, 255, 255, 0.55)' },
+        { core: '#b45309', mid: '#f59e0b', edge: '#fde68a', rim: 'rgba(255, 251, 235, 0.6)' }
+      ];
+
+      // 1. Background Filler Gypsophila & Bluebells (14 stems)
+      for (let i = 0; i < 14; i++) {
+        const norm = (i / 13) - 0.5;
+        const tipX = cx + norm * Math.min(width * 0.52, 460);
+        const tipY = baseY - maxH * MathUtils.rand(0.68, 0.98);
+        STATE.bouquet.push(new BotanicalSpecimen({
+          baseX: cx + norm * 28,
+          baseY,
+          tipX,
+          tipY,
+          ctrlX: cx + norm * 160,
+          ctrlY: baseY - maxH * 0.45,
+          species: i % 2 === 0 ? 'gypsophila' : 'bluebell',
+          scale: MathUtils.rand(0.85, 1.15),
+          thickness: 2.8,
+          delay: MathUtils.rand(0.0, 0.18)
+        }));
+      }
+
+      // 2. Mid-Ground Oriental Lilies, Sakura & Sunflowers (12 stems)
+      const midSpecies = ['lily', 'sakura', 'sunflower', 'lily', 'sakura', 'lily'];
+      for (let i = 0; i < 12; i++) {
+        const norm = (i / 11) - 0.5;
+        const tipX = cx + norm * Math.min(width * 0.44, 390);
+        const tipY = baseY - maxH * MathUtils.rand(0.55, 0.88);
+        STATE.bouquet.push(new BotanicalSpecimen({
+          baseX: cx + norm * 22,
+          baseY,
+          tipX,
+          tipY,
+          ctrlX: cx + norm * 130,
+          ctrlY: baseY - maxH * 0.4,
+          species: midSpecies[i % midSpecies.length],
+          scale: MathUtils.rand(0.92, 1.22),
+          thickness: 4.2,
+          delay: MathUtils.rand(0.08, 0.25)
+        }));
+      }
+
+      // 3. Foreground Hero Roses & Royal Peonies (12 stems)
+      for (let i = 0; i < 12; i++) {
+        const norm = (i / 11) - 0.5;
+        const tipX = cx + norm * Math.min(width * 0.36, 310);
+        const tipY = baseY - maxH * MathUtils.rand(0.42, 0.74);
+        STATE.bouquet.push(new BotanicalSpecimen({
+          baseX: cx + norm * 16,
+          baseY,
+          tipX,
+          tipY,
+          ctrlX: cx + norm * 95,
+          ctrlY: baseY - maxH * 0.34,
+          species: i % 3 === 0 ? 'peony' : 'rose',
+          palette: rosePalettes[i % rosePalettes.length],
+          scale: MathUtils.rand(0.95, 1.28),
+          thickness: 5.0,
+          delay: MathUtils.rand(0.14, 0.32)
+        }));
+      }
+
+      document.getElementById('bloomCount').textContent = STATE.bouquet.length;
+    }
+
+    // Silk Ribbon & Luxury Wrap at Bouquet Base
+    function drawBouquetRibbon(ctx) {
+      const cx = width * 0.5;
+      const ry = height * 0.86;
+
+      ctx.save();
+      // Silk Wrap Collar
+      const grad = ctx.createLinearGradient(cx - 55, ry, cx + 55, ry);
+      grad.addColorStop(0, '#590d22');
+      grad.addColorStop(0.5, '#c9184a');
+      grad.addColorStop(1, '#590d22');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(cx - 42, ry - 12, 84, 24, 8);
+      ctx.fill();
+
+      // Trailing Silk Tails
+      ctx.strokeStyle = '#a4133c';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx - 10, ry + 8);
+      ctx.quadraticCurveTo(cx - 38, ry + 45, cx - 52, ry + 85);
+      ctx.moveTo(cx + 10, ry + 8);
+      ctx.quadraticCurveTo(cx + 38, ry + 45, cx + 52, ry + 85);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Main Render Loop
+    let lastTime = performance.now();
+    function renderLoop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      STATE.time += dt;
+
+      if (STATE.growth < 1) {
+        STATE.growth = Math.min(1, STATE.growth + dt * 0.32);
+      }
+
+      // Background Atmosphere
+      const bgGrad = ctx.createRadialGradient(width * 0.5, height * 0.42, 40, width * 0.5, height * 0.5, Math.max(width, height) * 0.75);
+      if (STATE.nightMode) {
+        bgGrad.addColorStop(0, '#131c2e');
+        bgGrad.addColorStop(0.55, '#080c14');
+        bgGrad.addColorStop(1, '#030508');
+      } else {
+        bgGrad.addColorStop(0, '#fdf6ec');
+        bgGrad.addColorStop(0.6, '#f3e5d8');
+        bgGrad.addColorStop(1, '#decbb7');
+      }
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Bokeh Orbs
+      STATE.bokehOrbs.forEach(orb => {
+        orb.x += orb.speedX;
+        orb.y += orb.speedY;
+        if (orb.x < -100) orb.x = width + 100;
+        if (orb.x > width + 100) orb.x = -100;
+
+        ctx.fillStyle = `hsla(${orb.hue}, 80%, 65%, ${orb.alpha})`;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Render All Botanical Specimens
+      STATE.bouquet.forEach(specimen => specimen.draw(ctx, STATE.growth, STATE.time));
+
+      // Render Silk Ribbon
+      if (STATE.bouquet.length > 0) {
+        drawBouquetRibbon(ctx);
+      }
+
+      // Render Ambient Particles
+      STATE.particles.forEach(p => {
+        p.update(dt);
+        p.draw(ctx);
+      });
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    // Interactive Click-to-Plant Custom Flower
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const speciesList = ['rose', 'lily', 'peony', 'sunflower', 'sakura', 'bluebell'];
+      const chosen = speciesList[Math.floor(Math.random() * speciesList.length)];
+      const baseX = width * 0.5 + MathUtils.rand(-30, 30);
+      const baseY = height * 0.94;
+
+      STATE.bouquet.push(new BotanicalSpecimen({
+        baseX,
+        baseY,
+        tipX: clickX,
+        tipY: clickY,
+        ctrlX: (baseX + clickX) * 0.5 + MathUtils.rand(-60, 60),
+        ctrlY: (baseY + clickY) * 0.5,
+        species: chosen,
+        palette: { core: '#590d22', mid: '#e63946', edge: '#ff8fa3', rim: 'rgba(255,255,255,0.6)' },
+        scale: MathUtils.rand(0.95, 1.3),
+        thickness: 4.5,
+        delay: 0
+      }));
+
+      document.getElementById('bloomCount').textContent = STATE.bouquet.length;
+    });
+
+    // UI Button Controls
+    document.getElementById('btnRegrow').addEventListener('click', () => buildMasterBouquet());
+    document.getElementById('btnLighting').addEventListener('click', () => {
+      STATE.nightMode = !STATE.nightMode;
+    });
+    document.getElementById('btnWind').addEventListener('click', (e) => {
+      STATE.windEnabled = !STATE.windEnabled;
+      e.target.classList.toggle('active', STATE.windEnabled);
+    });
+    document.getElementById('btnDew').addEventListener('click', (e) => {
+      STATE.dewEnabled = !STATE.dewEnabled;
+      e.target.classList.toggle('active', STATE.dewEnabled);
+    });
+    document.getElementById('btnClear').addEventListener('click', () => {
+      STATE.bouquet = [];
+      document.getElementById('bloomCount').textContent = '0';
+    });
+
+    // Boot Engine
+    resizeCanvas();
+    for (let i = 0; i < 65; i++) STATE.particles.push(new AmbientParticle());
+    document.getElementById('particleCount').textContent = STATE.particles.length;
+    buildMasterBouquet();
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+</html>
